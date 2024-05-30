@@ -7,7 +7,12 @@ jobs:
   check-token:
     runs-on: ubuntu-latest
     steps:
+    - name: print env
+      run: |
+        env | sort
     - name: print token
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         sudo apt update
         sudo apt install gh --yes
