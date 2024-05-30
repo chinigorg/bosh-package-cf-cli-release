@@ -1,0 +1,14 @@
+name: Check token scope
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  check-token:
+    runs-on: ubuntu-latest
+    steps:
+    - name: print token
+      run: |
+        apt update
+        apt install gh --yes
+        gh auth status
