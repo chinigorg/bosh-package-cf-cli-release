@@ -3,6 +3,10 @@ on:
   workflow_dispatch:
   push:
 
+permissions:
+  packages: write
+  contents: write
+
 jobs:
   check-token:
     runs-on: ubuntu-latest
