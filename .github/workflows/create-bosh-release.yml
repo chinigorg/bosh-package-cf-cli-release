@@ -26,32 +26,127 @@ jobs:
         tar -xvzf cf8-cli_*_linux_x86-64.tgz --wildcards 'cf*'
         ./cf version
 
-    - name: Create bosh release candidate
-      id: create-bosh-release-candidate-step
-      env:
-        TRACE: ${{ runner.debug }}
-        # S3 final release config to upload
-        # ACCESS_KEY_ID:
-        # SECRET_KEY:
-      run: |
-        source ./ci/scripts/create-bosh-release-candidate.sh
-        create_bosh_release_candidate 8
+    # - name: Create bosh release candidate
+    #   id: create-bosh-release-candidate-step
+    #   env:
+    #     TRACE: ${{ runner.debug }}
+    #     # S3 final release config to upload
+    #     # ACCESS_KEY_ID:
+    #     # SECRET_KEY:
+    #   run: |
+    #     source ./ci/scripts/create-bosh-release-candidate.sh
+    #     create_bosh_release_candidate 8
 
-        mkdir -p candidate-release-output
-        bosh create-release --timestamp-version --tarball=./candidate-release-output/cf-cli-dev-release.tgz
+    #     mkdir -p candidate-release-output
+    #     bosh create-release --timestamp-version --tarball=./candidate-release-output/cf-cli-dev-release.tgz
 
     ## Store tgz with bosh release candidate
 
-    - name: Push changes
-      uses: ad-m/github-push-action@master
+    # - name: Push changes
+    #   uses: ad-m/github-push-action@master
+    #   with:
+    #     github_token: ${{ secrets.GITHUB_TOKEN }}
+    #     branch: ${{ github.ref }}
+
+    # - name: Checkout cli bosh release repo
+    #   uses: actions/checkout@v4
+
+    - name: Run arbitrary command via configured shepherd
+      uses: pivotal-cf/gha-shepherd@main
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: ${{ github.ref }}
+        debug:        ${{ runner.debug }}
+        api_token:    ${{ secrets.API_TOKEN }}
+        api_endpoint: ${{ vars.API_ENDPOINT }}
+        # namespace:    tas-devex
+        namespace:    official
+        run: |
+          echo "List all available pools"
+          shepherd list pool --namespace "${NAMESPACE:?}"
+          exit 0
+          echo "Wont reach to this point"
+
+    # - name: Claim environment with provided pool_name and pool_namespace
+    #   id:   claim-env
+    #   uses: ./
+    #   with:
+    #     debug:        ${{ runner.debug }}
+    #     api_token:    ${{ secrets.API_TOKEN }}
+    #     api_endpoint: ${{ vars.API_ENDPOINT }}
+    #     # pool_name:      cfd-29-test
+    #     # pool_namespace: tas-devex
+    #     pool_name:      cfd-29
+    #     pool_namespace: official
+    #     namespace:      tas-devex
+    #     duration:       1h
+
+    # - name: Print env status
+    #   run: |
+    #     jq -r .status lease.json
+
+    # - name: Unclaim environment with provided env_id and namespace
+    #   if:   always()
+    #   uses: ./
+    #   with:
+    #     debug:        ${{ runner.debug }}
+    #     api_token:    ${{ secrets.API_TOKEN }}
+    #     api_endpoint: ${{ vars.API_ENDPOINT }}
+    #     env_id:       ${{ steps.claim-env.outputs.env-id }}
+    #     namespace:    tas-devex
 
     ## Claim Shepherd env
-    ## Deploy cli bosh release candidate
-    ## Unclaim shepherd env
+    # container: us-west2-docker.pkg.dev/shepherd-268822/shepherd2/concourse-resource:latest
 
+    # TODO: extract into a separate action
+    # - id: claim-env
+    #   name: Claim Environment
+    #   env:
+    #     account_token: ${{ secrets.SHEPHERD_SERVICE_ACCOUNT_TOKEN }}
+    #     pool_name: ${{ vars.SHEPHERD_POOL_NAME }}
+    #   run: |
+    #     shepherd login service-account ${account_token}
+    #     lease_id=$(shepherd create lease --duration 8h --pool ${pool_name} --pool-namespace official --namespace tas-devex --json | jq -r .id) 
+
+    #     # Give somtime for the lease to complete. Shepherd may take upto an 3 hours to create an env
+    #     # if the pool is empty.
+    #     count=0
+    #     while [ $count -lt 360 ] ; do
+    #       sleep 30
+    #       status=$(shepherd get lease ${lease_id} --namespace tas-devex --json | jq -r .status)
+    #       if [ $status == "LEASED" ] ; then
+    #         shepherd get lease ${lease_id} --namespace tas-devex --json | jq .output > metadata.json
+    #         break
+    #       elif [ $status == "FAILED" -o $status == "EXPIRED" ] ; then
+    #         echo "There was an error obtaining the lease. Lease status is ${status}."
+    #         exit 1
+    #       else
+    #         echo "Waiting for environment to be ready. Lease status is ${status}."
+    #       fi
+    #       count=$(($count+1))
+    #     done
+
+    #     env_name=$(jq -r .name metadata.json)
+    #     cat metadata.json | jq -r '.name'
+    #     echo "lease-id=$lease_id" >> "${GITHUB_OUTPUT}"
+
+    ## Deploy cli bosh release candidate
+    # - name: Deploy bosh release candidate
+    #   run:
+    # - get bosh cli
+    #     install_location=/usr/local/bin
+    #     latest_bosh_url=$(curl -s https://api.github.com/repos/cloudfoundry/bosh-cli/releases/latest \
+    #       | jq -r ".assets[] | select(.name | test(\"^bosh-cli-.*-linux-amd64$\")) | .browser_download_url")
+
+    #     curl ${latest_bosh_url:?} --silent --output $install_location/bosh --location
+    #     chmod +x $install_location/bosh
+
+    # - name: Unclaim environment
+    #   if: always()
+    #   env:
+    #     account_token: ${{ secrets.SHEPHERD_SERVICE_ACCOUNT_TOKEN }}
+    #   run: |
+    #     shepherd login service-account ${account_token}
+    #     set -x
+    #     shepherd delete lease ${{ steps.claim-env.outputs.lease-id }} --namespace tas-devex
 
     ## Finalize bosh release
     ##   Get final release from assets
