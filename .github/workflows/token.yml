@@ -9,6 +9,6 @@ jobs:
     steps:
     - name: print token
       run: |
-        apt update
-        apt install gh --yes
+        sudo apt update
+        sudo apt install gh --yes
         gh auth status
